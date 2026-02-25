@@ -1,11 +1,11 @@
 from flask import Flask, jsonify
 import requests
 import pandas as pd
+import os
 
 app = Flask(__name__)
 
-import os
-API_KEY = os.environ.get("API_KEY")
+API_KEY = os.environ.get("FINNHUB_API_KEY")
 
 def calculate_rsi(close_prices, period=14):
     delta = pd.Series(close_prices).diff()
@@ -16,28 +16,27 @@ def calculate_rsi(close_prices, period=14):
     rs = avg_gain / avg_loss
     rsi = 100 - (100 / (1 + rs))
     return round(rsi.iloc[-1], 2)
+
 @app.route("/stock/<symbol>")
 def get_stock(symbol):
-    url = f"https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol={symbol}.T&apikey={API_KEY}"
-    data = requests.get(url).json()
+    symbol_t = f"{symbol}.T"
 
-    # 🔥 エラーチェック追加
-    if "Time Series (Daily)" not in data:
-        return jsonify({
-            "error": "Alpha Vantage API error",
-            "response": data
-        }), 400
+    # 最新株価
+    quote_url = f"https://finnhub.io/api/v1/quote?symbol={symbol_t}&token={API_KEY}"
+    quote = requests.get(quote_url).json()
 
-    series = data["Time Series (Daily)"]
-    dates = list(series.keys())
-    closes = [float(series[d]["4. close"]) for d in dates[:20]]
+    # 過去データ（RSI用）
+    candle_url = f"https://finnhub.io/api/v1/stock/candle?symbol={symbol_t}&resolution=D&count=30&token={API_KEY}"
+    candle = requests.get(candle_url).json()
 
-    latest_close = closes[0]
-    latest_volume = series[dates[0]]["5. volume"]
+    if "c" not in quote or candle.get("s") != "ok":
+        return jsonify({"error": "Finnhub API error", "quote": quote, "candle": candle}), 400
+
+    closes = candle["c"]
     rsi = calculate_rsi(closes)
 
     return jsonify({
-        "price": latest_close,
-        "volume": latest_volume,
+        "price": quote["c"],
+        "volume": quote["v"],
         "RSI": rsi
     })
