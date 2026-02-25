@@ -9,7 +9,7 @@ API_KEY = os.environ.get("TWELVE_API_KEY")
 @app.route("/stock/<symbol>")
 def get_stock(symbol):
 
-    symbol_t = f"{symbol}:TSE"
+    symbol_t = f"{symbol}.JP"
 
     price_url = f"https://api.twelvedata.com/price?symbol={symbol_t}&apikey={API_KEY}"
     price_res = requests.get(price_url).json()
