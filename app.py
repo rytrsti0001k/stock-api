@@ -16,11 +16,17 @@ def calculate_rsi(close_prices, period=14):
     rs = avg_gain / avg_loss
     rsi = 100 - (100 / (1 + rs))
     return round(rsi.iloc[-1], 2)
-
 @app.route("/stock/<symbol>")
 def get_stock(symbol):
     url = f"https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol={symbol}.T&apikey={API_KEY}"
     data = requests.get(url).json()
+
+    # 🔥 エラーチェック追加
+    if "Time Series (Daily)" not in data:
+        return jsonify({
+            "error": "Alpha Vantage API error",
+            "response": data
+        }), 400
 
     series = data["Time Series (Daily)"]
     dates = list(series.keys())
