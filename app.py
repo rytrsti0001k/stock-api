@@ -2,6 +2,7 @@ from flask import Flask, jsonify
 import requests
 import pandas as pd
 import os
+import time
 
 app = Flask(__name__)
 
@@ -21,12 +22,16 @@ def calculate_rsi(close_prices, period=14):
 def get_stock(symbol):
     symbol_t = f"{symbol}.T"
 
+    # 現在時刻
+    to_time = int(time.time())
+    from_time = to_time - (60 * 60 * 24 * 40)  # 約40日分
+
     # 最新株価
     quote_url = f"https://finnhub.io/api/v1/quote?symbol={symbol_t}&token={API_KEY}"
     quote = requests.get(quote_url).json()
 
     # 過去データ（RSI用）
-    candle_url = f"https://finnhub.io/api/v1/stock/candle?symbol={symbol_t}&resolution=D&count=30&token={API_KEY}"
+    candle_url = f"https://finnhub.io/api/v1/stock/candle?symbol={symbol_t}&resolution=D&from={from_time}&to={to_time}&token={API_KEY}"
     candle = requests.get(candle_url).json()
 
     if "c" not in quote or candle.get("s") != "ok":
