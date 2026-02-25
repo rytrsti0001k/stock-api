@@ -4,7 +4,8 @@ import pandas as pd
 
 app = Flask(__name__)
 
-API_KEY = "YOUR_API_KEY"
+import os
+API_KEY = os.environ.get("API_KEY")
 
 def calculate_rsi(close_prices, period=14):
     delta = pd.Series(close_prices).diff()
