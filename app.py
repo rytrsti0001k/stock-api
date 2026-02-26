@@ -1,43 +1,44 @@
-from flask import Flask, jsonify
+NAME_TO_CODE = {
+    "トヨタ": "7203",
+    "フジプレアム": "4237",
+    "日本精密": "7771",
+    "山一電機": "6941",
+    "ヒーハイスト": "6433",
+    "アドウェイズ": "2489",
+    "アスカネット": "2438",
+    "有沢製作所": "5208"
+}
+from fastapi import FastAPI
 import yfinance as yf
 import pandas as pd
+import ta
 
-app = Flask(__name__)
+app = FastAPI()
 
+def get_stock_data(code):
 
-# RSI計算
-def calculate_rsi(close, period=14):
-    delta = close.diff()
-    gain = delta.clip(lower=0)
-    loss = -delta.clip(upper=0)
-    avg_gain = gain.rolling(period).mean()
-    avg_loss = loss.rolling(period).mean()
-    rs = avg_gain / avg_loss
-    rsi = 100 - (100 / (1 + rs))
-    return rsi
+    ticker = f"{code}.T"
+    df = yf.download(ticker, period="3mo", interval="1d")
 
-@app.route("/")
-def home():
-    return "Stock API running"
+    if df.empty:
+        return {"error": "データ取得失敗"}
 
-@app.route("/stock/<symbol>")
-def get_stock(symbol):
+    df["RSI"] = ta.momentum.RSIIndicator(
+        close=df["Close"], window=14
+    ).rsi()
 
-    ticker = yf.Ticker(f"{symbol}.T")
-    hist = ticker.history(period="1mo")
+    latest = df.iloc[-1]
 
-    if hist.empty:
-        return jsonify({"error": "No stock data"}), 404
+    return {
+        "code": code,
+        "price": float(latest["Close"]),
+        "volume": int(latest["Volume"]),
+        "RSI": round(float(latest["RSI"]), 2)
+    }
 
-    price = hist["Close"].iloc[-1]
-    volume = hist["Volume"].iloc[-1]
+@app.get("/stock/{name}")
+def stock(name: str):
 
-    rsi_series = calculate_rsi(hist["Close"])
-    rsi = round(rsi_series.iloc[-1], 2)
+    code = NAME_TO_CODE.get(name, name)
 
-    return jsonify({
-        "symbol": symbol,
-        "price": round(float(price), 2),
-        "volume": int(volume),
-        "RSI": rsi
-    })
+    return get_stock_data(code)
