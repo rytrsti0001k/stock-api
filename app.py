@@ -4,6 +4,7 @@ import pandas as pd
 
 app = Flask(__name__)
 
+
 # RSI計算
 def calculate_rsi(close, period=14):
     delta = close.diff()
