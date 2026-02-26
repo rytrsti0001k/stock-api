@@ -1,26 +1,42 @@
 from flask import Flask, jsonify
-import requests
-import os
+import yfinance as yf
+import pandas as pd
 
 app = Flask(__name__)
 
-API_KEY = os.environ.get("TWELVE_API_KEY")
+# RSI計算
+def calculate_rsi(close, period=14):
+    delta = close.diff()
+    gain = delta.clip(lower=0)
+    loss = -delta.clip(upper=0)
+    avg_gain = gain.rolling(period).mean()
+    avg_loss = loss.rolling(period).mean()
+    rs = avg_gain / avg_loss
+    rsi = 100 - (100 / (1 + rs))
+    return rsi
+
+@app.route("/")
+def home():
+    return "Stock API running"
 
 @app.route("/stock/<symbol>")
 def get_stock(symbol):
 
-    symbol_t = f"{symbol}.JP"
+    ticker = yf.Ticker(f"{symbol}.T")
+    hist = ticker.history(period="1mo")
 
-    price_url = f"https://api.twelvedata.com/price?symbol={symbol_t}&apikey={API_KEY}"
-    price_res = requests.get(price_url).json()
+    if hist.empty:
+        return jsonify({"error": "No stock data"}), 404
 
-    rsi_url = f"https://api.twelvedata.com/rsi?symbol={symbol_t}&interval=1day&time_period=14&apikey={API_KEY}"
-    rsi_res = requests.get(rsi_url).json()
+    price = hist["Close"].iloc[-1]
+    volume = hist["Volume"].iloc[-1]
 
-    if "price" not in price_res or "values" not in rsi_res:
-        return jsonify({"error": "API error", "price": price_res, "rsi": rsi_res}), 400
+    rsi_series = calculate_rsi(hist["Close"])
+    rsi = round(rsi_series.iloc[-1], 2)
 
     return jsonify({
-        "price": float(price_res["price"]),
-        "RSI": float(rsi_res["values"][0]["rsi"])
+        "symbol": symbol,
+        "price": round(float(price), 2),
+        "volume": int(volume),
+        "RSI": rsi
     })
